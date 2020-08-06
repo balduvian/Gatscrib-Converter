@@ -6,8 +6,16 @@
 const map = new Array<{result: string, vowel: boolean} | undefined>(256);
 const doubles = new Array<{key: string, result: string}>();
 
+let mapFirst = 255;
+let mapLast = 0;
+
 const addToMap = (char: string, replacement: string, vowel?: boolean) => {
-	map[char.charCodeAt(0)] = {result: replacement, vowel: vowel || false};
+	const index = char.charCodeAt(0);
+
+	map[index] = {result: replacement, vowel: vowel || false};
+
+	if (index < mapFirst) mapFirst = index;
+	if (index + 1 > mapLast) mapLast = index + 1;
 }
 
 addToMap('i', '°', true);
@@ -47,18 +55,21 @@ doubles.push({ key: 'sh', result: '൪'});
 
 const input = document.getElementById('input') as HTMLTextAreaElement;
 const output = document.getElementById('output') as HTMLTextAreaElement;
+const button = document.getElementById('switch') as HTMLButtonElement;
 
-input.onchange = () => {
+let mode = true;
+
+const latinToGatscrib = (text: string) => {
 	let str = '';
 	let lastIsConst = false;
 
-	for (let i = 0; i < input.value.length; ++i) {
-		const current = input.value.charAt(i);
+	for (let i = 0; i < text.length; ++i) {
+		const current = text.charAt(i);
 
-		if (i !== input.value.length - 1) {
+		if (i !== text.length - 1) {
 			/* see if this is a double char code */
 			if (!doubles.every(double => {
-				if (current === double.key[0] && input.value[i + 1] === double.key[1]) {
+				if (current === double.key[0] && text[i + 1] === double.key[1]) {
 					str += double.result;
 					++i;
 					lastIsConst = true;
@@ -70,7 +81,7 @@ input.onchange = () => {
 			})) continue;
 		}
 	
-		const code = input.value.charCodeAt(i);
+		const code = text.charCodeAt(i);
 
 		if (code < 256 && map[code] !== undefined) {
 			if (map[code].vowel) {
@@ -87,9 +98,73 @@ input.onchange = () => {
 		} else {
 			/* space or otherwise */
 			lastIsConst = false;
-			str += input.value.charAt(i);
+			str += text.charAt(i);
 		}
 	}
 
-	output.value = str;
+	return str;
+}
+
+const gatscribToLatin = (text: string) => {
+	let str = '';
+
+	for (let i = 0; i < text.length; ++i) {
+		const current = text.charAt(i);
+
+		if (current === 'ഠ') continue;
+
+		let found = false;
+
+		for (let j = mapFirst; j < mapLast && !found; ++j) {
+			const mapItem = map[j];
+			if (mapItem === undefined) continue;
+
+			/* t and h do not work for some reason */
+
+			if (mapItem.result === current) {
+				str += String.fromCharCode(j);
+				found = true;
+			}
+		}
+
+		if (!found) {
+			for (let j = 0; j < doubles.length && !found; ++j) {
+				const double = doubles[j];
+
+				if (current === double.result) {
+					str += double.key;
+					found = true;
+				}
+			}
+		}
+
+		if (!found) {
+			str += current;
+		}
+	}
+
+	return str;
+}
+
+const setButtonText = (mode: boolean) => {
+	button.textContent = mode ? 'Latin to Gatscrib' : 'Gatscrib to Latin';
+}
+
+const convert = (text: string, mode: boolean) => {
+	return mode ? latinToGatscrib(text) : gatscribToLatin(text);
+}
+
+setButtonText(mode);
+
+button.onclick = () => {
+	mode = !mode;
+
+	setButtonText(mode);
+
+	input.value = output.value;
+	output.value = convert(input.value, mode);
+}
+
+input.onchange = () => {
+	output.value = convert(input.value, mode);
 }
